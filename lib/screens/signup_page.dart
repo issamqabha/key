@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'signin_page.dart';
 import 'home_page.dart';
 
@@ -90,6 +89,7 @@ class _SignUpPageState extends State<SignUpPage> {
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
+
       );
       return await FirebaseAuth.instance.signInWithCredential(credential);
     } catch (e) {
@@ -111,23 +111,23 @@ class _SignUpPageState extends State<SignUpPage> {
     return null;
   }
 
-  Future<UserCredential?> signInWithApple() async {
-    try {
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
-      );
-
-      final oauthCredential = OAuthProvider("apple.com").credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
-
-      return await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-    } catch (e) {
-      print("Apple Sign-In Error: $e");
-      return null;
-    }
-  }
+  // Future<UserCredential?> signInWithApple() async {
+  //   try {
+  //     final appleCredential = await SignInWithApple.getAppleIDCredential(
+  //       scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+  //     );
+  //
+  //     final oauthCredential = OAuthProvider("apple.com").credential(
+  //       idToken: appleCredential.identityToken,
+  //       accessToken: appleCredential.authorizationCode,
+  //     );
+  //
+  //     return await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+  //   } catch (e) {
+  //     print("Apple Sign-In Error: $e");
+  //     return null;
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +221,12 @@ class _SignUpPageState extends State<SignUpPage> {
                     Column(
                       children: [
                         ElevatedButton.icon(
-                          icon: Image.asset('assets/google.png', height: 24),
+                          icon: InkWell(
+                              onTap: () {
+                                signInWithGoogle();
+                                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
+                              },
+                              child: Image.asset('assets/google.png', height: 24)),
                           label: const Text("Sign up with Google"),
                           onPressed: () async {
                             final user = await signInWithGoogle();
@@ -246,12 +251,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           ElevatedButton.icon(
                             icon: const Icon(Icons.apple),
                             label: const Text("Sign up with Apple"),
-                            onPressed: () async {
-                              final user = await signInWithApple();
-                              if (user != null && mounted) {
-                                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
-                              }
-                            },
+                            onPressed: () {}
                           ),
                       ],
                     ),
