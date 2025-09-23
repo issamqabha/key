@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'signin_page.dart';
 import 'home_page.dart';
 
@@ -21,6 +22,20 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _passwordVisible = false;
   bool _confirmPasswordVisible = false;
 
+  final CollectionReference users = FirebaseFirestore.instance.collection('users');
+
+  Future<void> addUser(String uid, String email) async {
+    try {
+      await users.doc(uid).set({
+        'email': email,
+        'created_at': DateTime.now(),
+      });
+      print("User Added ✅");
+    } catch (e) {
+      print("Firestore Error: $e");
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -32,7 +47,7 @@ class _SignUpPageState extends State<SignUpPage> {
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return 'Enter your email';
     final emailRegex = RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
-    if (!emailRegex.hasMatch(value)) return 'Enter a valid email format';
+    if (!emailRegex.hasMatch(value)) return 'Enter a valid email';
     return null;
   }
 
@@ -43,7 +58,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final hasNumber = RegExp(r'[0-9]').hasMatch(value);
     final hasSpecial = RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value);
     if (!hasLetter || !hasNumber || !hasSpecial) {
-      return 'Password must include letters, numbers & a special character';
+      return 'Password must include letters, numbers & special character';
     }
     return null;
   }
@@ -58,6 +73,8 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passwordController.text.trim(),
       );
 
+      await addUser(credential.user!.uid, credential.user!.email!);
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -66,10 +83,13 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } on FirebaseAuthException catch (e) {
       String message;
-      if (e.code == 'weak-password') message = 'The password provided is too weak.';
-      else if (e.code == 'email-already-in-use') message = 'The account already exists for that email.';
-      else message = 'Error: ${e.message}';
-
+      if (e.code == 'weak-password') {
+        message = 'Password is too weak';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Email already in use';
+      } else {
+        message = e.message ?? 'Unknown error';
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.red),
@@ -80,7 +100,6 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // ===== Social Sign-Up/Login Methods =====
   Future<UserCredential?> signInWithGoogle() async {
     try {
       final googleUser = await GoogleSignIn().signIn();
@@ -89,7 +108,6 @@ class _SignUpPageState extends State<SignUpPage> {
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
-
       );
       return await FirebaseAuth.instance.signInWithCredential(credential);
     } catch (e) {
@@ -111,24 +129,6 @@ class _SignUpPageState extends State<SignUpPage> {
     return null;
   }
 
-  // Future<UserCredential?> signInWithApple() async {
-  //   try {
-  //     final appleCredential = await SignInWithApple.getAppleIDCredential(
-  //       scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
-  //     );
-  //
-  //     final oauthCredential = OAuthProvider("apple.com").credential(
-  //       idToken: appleCredential.identityToken,
-  //       accessToken: appleCredential.authorizationCode,
-  //     );
-  //
-  //     return await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-  //   } catch (e) {
-  //     print("Apple Sign-In Error: $e");
-  //     return null;
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,8 +149,14 @@ class _SignUpPageState extends State<SignUpPage> {
                     const SizedBox(height: 20),
                     Icon(Icons.person_add_alt_1, size: 60, color: Colors.teal),
                     const SizedBox(height: 12),
-                    Text('Create Account',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal.shade700)),
+                    Text(
+                      'Create Account',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal.shade700,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
@@ -221,12 +227,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     Column(
                       children: [
                         ElevatedButton.icon(
-                          icon: InkWell(
-                              onTap: () {
-                                signInWithGoogle();
-                                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
-                              },
-                              child: Image.asset('assets/google.png', height: 24)),
+                          icon: Image.asset('assets/google.png', height: 24),
                           label: const Text("Sign up with Google"),
                           onPressed: () async {
                             final user = await signInWithGoogle();
@@ -251,15 +252,17 @@ class _SignUpPageState extends State<SignUpPage> {
                           ElevatedButton.icon(
                             icon: const Icon(Icons.apple),
                             label: const Text("Sign up with Apple"),
-                            onPressed: () {}
+                            onPressed: () {},
                           ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushReplacement(context,
-                            MaterialPageRoute(builder: (_) => const SignInPage()));
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignInPage()),
+                        );
                       },
                       child: const Text('Already have an account? Sign in'),
                     ),
